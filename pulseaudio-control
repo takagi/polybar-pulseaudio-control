@@ -25,7 +25,9 @@ VOLUME_MAX=130
 LISTEN_TIMEOUT=0.05
 # shellcheck disable=SC2016
 FORMAT='$VOL_ICON ${VOL_LEVEL}%  $ICON_NODE $NODE_NICKNAME'
+FORMAT_MUTED=
 declare -A NODE_NICKNAMES
+declare -A NODE_ICONS
 declare -a ICONS_VOLUME
 declare -a NODE_BLACKLIST
 
@@ -105,6 +107,13 @@ function getNickname() {
     elif [ -z "$NODE_NICKNAME" ]; then
         NODE_NICKNAME="S${SINK_OR_SOURCE} #$1"
     fi
+}
+
+function getNodeIcon() {
+    getNodeName "$1"
+    unset NODE_ICON
+
+    NODE_ICON="${NODE_ICONS[$nodeName]}"
 }
 
 # Gets node nickname based on a given property.
@@ -382,16 +391,21 @@ function output() {
     fi
 
     getNickname "$curNode"
+    getNodeIcon "$curNode"
 
     # Showing the formatted message
     if [ "$IS_MUTED" = "yes" ]; then
         # shellcheck disable=SC2034
         VOL_ICON=$ICON_MUTED
-        content="$(eval echo "$FORMAT")"
-        if [ -n "$COLOR_MUTED" ]; then
-            echo "${COLOR_MUTED}${content}${END_COLOR}"
+        if [ -n "$FORMAT_MUTED" ]; then
+            eval echo "$FORMAT_MUTED"
         else
-            echo "$content"
+            content="$(eval echo "$FORMAT")"
+            if [ -n "$COLOR_MUTED" ]; then
+                echo "${COLOR_MUTED}${content}${END_COLOR}"
+            else
+                echo "$content"
+            fi
         fi
     else
         eval echo "$FORMAT"
@@ -577,11 +591,17 @@ while [[ "$1" = --* ]]; do
             ;;
         --node-nickname)
             if getOptVal "$@"; then shift; fi
-            NODE_NICKNAMES["${val//:*/}"]="${val//*:}"
+            IFS=: read -r node nickname icon <<< "${val}"
+            NODE_NICKNAMES["${node}"]="${nickname}"
+            NODE_ICONS["${node}"]="${icon}"
             ;;
         --format)
             if getOptVal "$@"; then shift; fi
             FORMAT="$val"
+            ;;
+        --format-muted)
+            if getOptVal "$@"; then shift; fi
+            FORMAT_MUTED="$val"
             ;;
         --node-type)
             if getOptVal "$@"; then shift; fi
